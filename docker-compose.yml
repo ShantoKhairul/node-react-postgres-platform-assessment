@@ -1,0 +1,94 @@
+# Local containerized environment:  docker compose up --build
+#
+#   browser ──► frontend (nginx :8080) ──/api──► backend (:4000) ──► postgres (:5432)
+#
+# Configuration comes from environment variables. Compose reads an optional
+# `.env` file next to this file (copy .env.example -> .env to override). The
+# `:-` defaults below are DEV-ONLY conveniences so a bare `docker compose up`
+# works; real environments (Kubernetes / CI) inject credentials from Secrets.
+
+name: node-react-postgres
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-appuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev-only-change-me}
+      POSTGRES_DB: ${DB_NAME:-appdb}
+    volumes:
+      # Named volume => data survives `docker compose down` and restarts.
+      # (Only `docker compose down -v` removes it.)
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: node-react-backend:local
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      DB_HOST: postgres # service name == DNS name on the compose network
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-appuser}
+      DB_PASSWORD: ${DB_PASSWORD:-dev-only-change-me}
+      DB_NAME: ${DB_NAME:-appdb}
+    depends_on:
+      postgres:
+        condition: service_healthy # wait for pg_isready, not just "started"
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-4000}:4000" # direct API access for debugging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - edge
+      - data
+    # Health is defined by HEALTHCHECK in Dockerfile.backend (/api/health/live).
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # API base URL baked into the bundle (Vite inlines it at build time).
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    image: node-react-frontend:local
+    restart: unless-stopped
+    environment:
+      # Where nginx proxies /api/* to (resolved by Docker DNS).
+      BACKEND_URL: http://backend:4000
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - edge
+
+networks:
+  # edge: what the browser-facing tier can reach (frontend <-> backend).
+  edge: {}
+  # data: backend <-> datastores only. `internal: true` = no route to the
+  # outside world and the frontend is not attached, so it can never talk to
+  # Postgres directly.
+  data:
+    internal: true
+
+volumes:
+  postgres_data:
