@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1.7
+#
+# Backend image (Express API + BullMQ worker share this image; the worker just
+# overrides the command: `node src/worker.js`).
+#
+# Build context is the repo root (see docker-compose.yml / CI), so paths are
+# prefixed with backend/.
+
+ARG NODE_VERSION=20
+
+# ---- Stage 1: production dependencies only --------------------------------
+FROM node:${NODE_VERSION}-alpine AS deps
+WORKDIR /app
+# Copy only the manifests first so this layer is cached until deps change.
+COPY backend/package.json backend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
+
+# ---- Stage 2: minimal runtime image ---------------------------------------
+FROM node:${NODE_VERSION}-alpine AS runtime
+ENV NODE_ENV=production \
+    PORT=4000
+WORKDIR /app
+
+# tini = proper PID 1: forwards SIGTERM so `docker stop` / pod termination is
+# graceful, and reaps zombies.
+RUN apk add --no-cache tini
+
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+COPY --chown=node:node backend/package.json ./
+COPY --chown=node:node backend/src ./src
+
+# Never run as root. The official node image ships an unprivileged `node` user.
+USER node
+EXPOSE 4000
+
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
+  CMD wget -qO- "http://127.0.0.1:${PORT}/api/health/live" >/dev/null || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "src/index.js"]

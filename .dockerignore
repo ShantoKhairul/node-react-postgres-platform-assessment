@@ -1,0 +1,30 @@
+# Keep the build context (repo root, shared by both Dockerfiles) small and
+# keep secrets / local state out of images.
+**/node_modules
+**/dist
+**/.vite
+npm-debug.log*
+
+.git
+.gitignore
+.github
+
+# Local secrets and env files (never bake these into an image)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Not needed to build the images
+k8s
+observability
+docs
+scripts
+*.md
+docker-compose*.yml
+Dockerfile.*
+Makefile
+.dockerignore
+*.log

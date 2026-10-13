@@ -1,0 +1,46 @@
+# syntax=docker/dockerfile:1.7
+#
+# Frontend image: Vite build -> static files served by unprivileged nginx.
+# nginx also reverse-proxies /api/* to the backend (see
+# frontend/nginx.conf.template), so the browser only ever talks to ONE origin.
+#
+# Build context is the repo root, so paths are prefixed with frontend/.
+
+ARG NODE_VERSION=20
+ARG NGINX_VERSION=1.27-alpine
+
+# ---- Stage 1: build the static bundle --------------------------------------
+FROM node:${NODE_VERSION}-alpine AS build
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+COPY frontend/ ./
+
+# API base URL the browser uses. Vite inlines VITE_* vars at BUILD time, so this
+# is a build arg. "/api" (same origin, proxied by nginx or the Ingress) is the
+# default and the recommended value; override it for a split-origin setup, e.g.
+#   docker build --build-arg VITE_API_BASE_URL=http://localhost:4000/api ...
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+RUN npm run build
+
+# ---- Stage 2: runtime (static files + nginx, non-root) ---------------------
+FROM nginxinc/nginx-unprivileged:${NGINX_VERSION} AS runtime
+
+# The official entrypoint renders /etc/nginx/templates/*.template with envsubst
+# at container start, so the upstream is configured via env (BACKEND_URL) and
+# the same image works in Compose and in every Kubernetes namespace.
+# NGINX_ENTRYPOINT_LOCAL_RESOLVERS makes the entrypoint export
+# NGINX_LOCAL_RESOLVERS (the DNS server from /etc/resolv.conf), which the
+# template uses so nginx re-resolves the backend name at runtime instead of
+# crashing at boot if the backend is not up yet.
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
+    BACKEND_URL=http://backend:4000
+
+COPY --chown=nginx:nginx frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build --chown=nginx:nginx /app/dist /usr/share/nginx/html
+
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1
