@@ -3,6 +3,7 @@
 #    (Task 3) can bind it to host ports 80/443
 #  - 80/443  -> Ingress controller  => http://node-react.local
 #  - 30080   -> frontend NodePort   => http://localhost:30080
+#  - 30300   -> Grafana NodePort    => http://localhost:30300
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -22,4 +23,7 @@ nodes:
         protocol: TCP
       - containerPort: 30080
         hostPort: 30080
+        protocol: TCP
+      - containerPort: 30300
+        hostPort: 30300
         protocol: TCP

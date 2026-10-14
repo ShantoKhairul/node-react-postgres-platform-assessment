@@ -3,11 +3,17 @@ import cors from "cors";
 import { read, write, pingWrite } from "./db.js";
 import redis from "./redisClient.js";
 import { enqueueItemCreated } from "./queue.js";
+import { observe, metricsHandler } from "./metrics.js";
 import { searchHealth, searchItems } from "./search.js";
 
 export const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(observe);
+
+// Scraped by Prometheus straight from the pod IP. Deliberately outside /api, so
+// the Ingress (which only routes /api and /) never exposes it to the internet.
+app.get("/metrics", metricsHandler);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

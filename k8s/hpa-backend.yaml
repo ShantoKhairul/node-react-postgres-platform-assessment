@@ -1,0 +1,31 @@
+# Scales the backend on CPU. Needs metrics-server (scripts/install-metrics-server.sh)
+# and CPU *requests* on the pods (set in backend-deployment.yaml): utilization is
+# measured against the request, so 60% of 100m = 60m per pod.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: dev
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2 # HA floor (also satisfies the PodDisruptionBudget)
+  maxReplicas: 6 # bounded by what a laptop-sized kind node can schedule
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60 # headroom to absorb a spike while new pods start
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0 # react immediately to load
+      policies:
+        - {type: Pods, value: 2, periodSeconds: 30}
+    scaleDown:
+      stabilizationWindowSeconds: 120 # avoid flapping after a burst (prod: 300+)
+      policies:
+        - {type: Pods, value: 1, periodSeconds: 60}
