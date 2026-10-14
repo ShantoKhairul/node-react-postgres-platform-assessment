@@ -1,0 +1,16 @@
+# Non-secret configuration shared by the backend (and, later, the worker).
+# Credentials live in app-secrets.yaml, never here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: dev
+  labels:
+    app.kubernetes.io/part-of: node-react-postgres
+data:
+  PORT: "4000"
+  # In-namespace Service name. Kubernetes DNS resolves it to the ClusterIP; the
+  # fully-qualified form is postgres-service.dev.svc.cluster.local.
+  DB_HOST: postgres-service
+  DB_PORT: "5432"
+  DB_NAME: appdb

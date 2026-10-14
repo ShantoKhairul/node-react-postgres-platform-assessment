@@ -1,0 +1,17 @@
+# Internal-only (ClusterIP). The only way in from outside the cluster is the
+# Ingress (Task 3), which routes /api to this Service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: dev
+  labels:
+    app: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http

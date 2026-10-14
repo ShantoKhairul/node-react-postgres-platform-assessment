@@ -1,0 +1,17 @@
+# Internal-only (ClusterIP): reachable as postgres-service.dev.svc.cluster.local
+# from inside the cluster, never from outside. This is the *write* endpoint.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: dev
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
