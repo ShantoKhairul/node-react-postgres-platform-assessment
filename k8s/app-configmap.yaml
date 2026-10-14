@@ -1,4 +1,4 @@
-# Non-secret configuration shared by the backend (and, later, the worker).
+# Non-secret configuration shared by the backend and the queue worker.
 # Credentials live in app-secrets.yaml, never here.
 apiVersion: v1
 kind: ConfigMap
@@ -14,3 +14,8 @@ data:
   DB_HOST: postgres-service
   DB_PORT: "5432"
   DB_NAME: appdb
+  # Platform services (all internal ClusterIP Services in this namespace).
+  # No credentials in these values; in production Redis would have AUTH and its
+  # URL would move to the Secret.
+  REDIS_URL: redis://redis-service:6379
+  SEARCH_URL: http://search-service:9200

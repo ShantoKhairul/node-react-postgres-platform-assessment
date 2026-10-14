@@ -3,7 +3,7 @@ import cors from "cors";
 import { read, write, pingWrite } from "./db.js";
 import redis from "./redisClient.js";
 import { enqueueItemCreated } from "./queue.js";
-import { searchHealth } from "./search.js";
+import { searchHealth, searchItems } from "./search.js";
 
 export const app = express();
 app.use(cors());
@@ -41,6 +41,17 @@ app.get("/api/health/search", async (req, res) => {
     res.json({ status: "ok", cluster: health.status });
   } catch (err) {
     res.status(503).json({ status: "error", error: err.message });
+  }
+});
+
+// Full-text search over items, served by OpenSearch (populated by the worker).
+app.get("/api/search", async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  if (!q) return res.status(400).json({ error: "q is required" });
+  try {
+    res.json(await searchItems(q));
+  } catch (err) {
+    res.status(503).json({ error: err.message });
   }
 });
 

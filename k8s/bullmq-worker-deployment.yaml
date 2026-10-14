@@ -1,0 +1,42 @@
+# Queue consumer. Same image as the API (Dockerfile.backend), different command.
+# It has no HTTP port, so no Service; liveness is process-based. Scale it
+# independently of the API to drain a backlog.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bullmq-worker
+  namespace: dev
+  labels:
+    app: bullmq-worker
+    tier: worker
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: bullmq-worker
+  template:
+    metadata:
+      labels:
+        app: bullmq-worker
+        tier: worker
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: worker
+          image: node-react-backend:local # CI rewrites to the registry image
+          imagePullPolicy: IfNotPresent
+          command: ["node", "src/worker.js"]
+          envFrom:
+            - configMapRef:
+                name: app-config
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 250m, memory: 192Mi}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
