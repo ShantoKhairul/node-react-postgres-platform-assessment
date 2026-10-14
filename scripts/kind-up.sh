@@ -19,6 +19,11 @@ else
 fi
 kubectl config use-context "kind-$CLUSTER" >/dev/null
 
+echo "==> Ingress controller"
+if ! kubectl get ns ingress-nginx >/dev/null 2>&1; then
+  ./scripts/install-ingress.sh
+fi
+
 echo "==> Build + load images"
 docker build -f Dockerfile.backend  -t node-react-backend:local  .
 docker build -f Dockerfile.frontend -t node-react-frontend:local .
@@ -43,3 +48,4 @@ echo
 kubectl -n dev get all
 echo
 echo "App (NodePort): http://localhost:30080"
+echo "App (Ingress):  http://node-react.local   (needs: 127.0.0.1 node-react.local in your hosts file)"
