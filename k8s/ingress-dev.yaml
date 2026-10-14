@@ -1,17 +1,29 @@
 # API gateway for the dev namespace (ingress-nginx).
 #   http://node-react.local/      -> frontend-service:80
 #   http://node-react.local/api/* -> backend-service:4000
-# Longest-prefix wins, so /api goes to the backend and everything else to the
+# Longest prefix wins, so /api goes to the backend and everything else to the
 # frontend. No rewrite: the backend already serves its routes under /api.
+#
+# Two Ingress objects share one host because ingress-nginx rate-limit
+# annotations apply per Ingress, and the API deserves a much tighter limit than
+# static assets. Exceeding a limit returns HTTP 429 (limit-req-status-code is set
+# in the controller ConfigMap by scripts/install-ingress.sh).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: app-ingress
+  name: api-ingress
   namespace: dev
   labels:
     app.kubernetes.io/part-of: node-react-postgres
   annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+    # Per client IP. 10 req/s sustained is ~10x what a human clicking the UI
+    # produces, yet it blunts scripted abuse. Burst multiplier 3 => short bursts
+    # of 30 are absorbed (page load fires several calls at once).
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+    # Max simultaneous connections per client IP - stops slow-loris style hogging.
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+    nginx.ingress.kubernetes.io/proxy-body-size: 100k # API payloads are tiny JSON
 spec:
   ingressClassName: nginx
   rules:
@@ -25,6 +37,24 @@ spec:
                 name: backend-service
                 port:
                   number: 4000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-ingress
+  namespace: dev
+  labels:
+    app.kubernetes.io/part-of: node-react-postgres
+  annotations:
+    # Static assets: generous (one page load = a dozen files), but not unlimited.
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: node-react.local
+      http:
+        paths:
           - path: /
             pathType: Prefix
             backend:

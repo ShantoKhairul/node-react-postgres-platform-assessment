@@ -34,3 +34,12 @@ test("POST /api/items without a name is rejected with 400", async () => {
   });
   assert.equal(res.status, 400);
 });
+
+test("GET /metrics exposes Prometheus metrics incl. request counter", async () => {
+  await fetch(`${base}/api/health`);
+  const res = await fetch(`${base}/metrics`);
+  assert.equal(res.status, 200);
+  const text = await res.text();
+  assert.match(text, /http_requests_total\{[^}]*route="\/api\/health"/);
+  assert.match(text, /process_cpu_seconds_total/);
+});
