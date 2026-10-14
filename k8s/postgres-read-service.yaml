@@ -1,0 +1,19 @@
+# Simulated read replica endpoint. In dev it selects the SAME single Postgres
+# pod as postgres-service; with a real primary/replica setup (CloudNativePG,
+# Patroni, RDS) only this selector/endpoint changes - the app keeps using
+# DB_READ_URL and DB_WRITE_URL and needs no code change.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-read-service
+  namespace: dev
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

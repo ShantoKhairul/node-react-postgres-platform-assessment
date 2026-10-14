@@ -1,0 +1,57 @@
+# Isolation: platform services are reachable only from the pods that need them.
+# Requires a CNI that enforces NetworkPolicy (kind's kindnet does; minikube:
+# start with --cni=calico). Ingress controller -> frontend/backend stays open.
+#
+# The default-deny is deliberately scoped (podSelector on datastores) rather than
+# namespace-wide, so probes, the ingress controller and Prometheus keep working.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-backend-only
+  namespace: dev
+spec:
+  podSelector:
+    matchLabels: {app: postgres}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: backend}
+      ports:
+        - {protocol: TCP, port: 5432}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-allow-backend-and-worker
+  namespace: dev
+spec:
+  podSelector:
+    matchLabels: {app: redis}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: backend}
+        - podSelector:
+            matchLabels: {app: bullmq-worker}
+      ports:
+        - {protocol: TCP, port: 6379}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: search-allow-backend-and-worker
+  namespace: dev
+spec:
+  podSelector:
+    matchLabels: {app: search}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: backend}
+        - podSelector:
+            matchLabels: {app: bullmq-worker}
+      ports:
+        - {protocol: TCP, port: 9200}

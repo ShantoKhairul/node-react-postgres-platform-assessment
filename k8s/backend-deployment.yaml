@@ -47,6 +47,13 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: DB_PASSWORD
+            # Simulated read/write cluster. $(VAR) is expanded by Kubernetes
+            # from the env entries ABOVE it, so the password stays in the
+            # Secret and never appears in a ConfigMap or in git.
+            - name: DB_WRITE_URL # primary: every INSERT/UPDATE/DELETE
+              value: postgres://$(DB_USER):$(DB_PASSWORD)@postgres-service:5432/appdb
+            - name: DB_READ_URL # replica: plain SELECTs
+              value: postgres://$(DB_USER):$(DB_PASSWORD)@postgres-read-service:5432/appdb
           # Give a slow start up to 60s before liveness takes over.
           startupProbe:
             httpGet:

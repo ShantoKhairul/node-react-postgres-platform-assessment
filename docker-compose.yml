@@ -43,9 +43,17 @@ services:
       DB_USER: ${DB_USER:-appuser}
       DB_PASSWORD: ${DB_PASSWORD:-dev-only-change-me}
       DB_NAME: ${DB_NAME:-appdb}
+      # Simulated read/write cluster: two URLs. Locally both hit the one
+      # Postgres; point DB_READ_URL at a replica and nothing else changes.
+      DB_WRITE_URL: postgres://${DB_USER:-appuser}:${DB_PASSWORD:-dev-only-change-me}@postgres:5432/${DB_NAME:-appdb}
+      DB_READ_URL: postgres://${DB_USER:-appuser}:${DB_PASSWORD:-dev-only-change-me}@postgres:5432/${DB_NAME:-appdb}
+      REDIS_URL: redis://redis:6379
+      SEARCH_URL: http://search:9200
     depends_on:
       postgres:
         condition: service_healthy # wait for pg_isready, not just "started"
+      redis:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${BACKEND_PORT:-4000}:4000" # direct API access for debugging
     security_opt:
@@ -56,6 +64,63 @@ services:
       - edge
       - data
     # Health is defined by HEALTHCHECK in Dockerfile.backend (/api/health/live).
+
+  # ---- Platform services (Task 5): internal only, never published to host ----
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # noeviction is required by BullMQ (an evicting Redis would drop jobs).
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - data
+
+  search:
+    image: opensearchproject/opensearch:2.15.0
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true" # dev mode ONLY - safe because the network is internal
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      bootstrap.memory_lock: "false"
+      OPENSEARCH_JAVA_OPTS: -Xms256m -Xmx256m
+    volumes:
+      - search_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health?local=true >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    networks:
+      - data
+
+  # Queue consumer: same image as the API, different command.
+  worker:
+    image: node-react-backend:local
+    pull_policy: never # built by the backend service above
+    command: ["node", "src/worker.js"]
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379
+      SEARCH_URL: http://search:9200
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      disable: true # image HEALTHCHECK probes the API port, which the worker lacks
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - data
 
   frontend:
     build:
@@ -92,3 +157,4 @@ networks:
 
 volumes:
   postgres_data:
+  search_data:
