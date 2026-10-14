@@ -1,0 +1,24 @@
+# Local-cluster PersistentVolume backed by a directory on the node (kind /
+# minikube). PVs are cluster-scoped (no namespace), so the name carries the
+# environment; CI rewrites "-dev" per target namespace.
+#
+# In a real cluster you would delete this file and let a StorageClass provision
+# volumes dynamically from the PVC alone.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv-dev
+  labels:
+    app: postgres
+    type: local
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  # Retain: deleting the claim must never delete the database files.
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/postgres-dev
+    type: DirectoryOrCreate

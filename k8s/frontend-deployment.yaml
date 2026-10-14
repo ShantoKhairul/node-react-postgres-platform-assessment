@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: dev
+  labels:
+    app: frontend
+    tier: web
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        tier: web
+    spec:
+      containers:
+        - name: frontend
+          image: node-react-frontend:local # CI rewrites to the registry image
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Downward API: the pod learns its own namespace, so the same
+            # manifest works unchanged in dev / preprod / release.
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # nginx proxies /api/* here. Fully-qualified name because nginx's
+            # resolver does not apply the pod's DNS search domains.
+            # ($(VAR) is expanded by Kubernetes from POD_NAMESPACE above.)
+            - name: BACKEND_URL
+              value: http://backend-service.$(POD_NAMESPACE).svc.cluster.local:4000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true # nginx-unprivileged runs as uid 101
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
