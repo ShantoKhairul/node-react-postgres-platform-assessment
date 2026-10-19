@@ -132,7 +132,7 @@ jobs:
 
   deploy:
     name: Deploy to ${{ needs.build-and-push.outputs.namespace }}
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && vars.DEPLOY_RUNNER != ''
     needs: build-and-push
     # Hosted runners cannot reach a local kind cluster. Set the repository
     # variable DEPLOY_RUNNER to a self-hosted runner label (e.g. "kind") that
