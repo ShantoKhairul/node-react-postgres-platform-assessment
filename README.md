@@ -461,14 +461,14 @@ CPU per pod (vs limit) · memory working set per pod (vs limit) · request rate 
 
 ### Logging (Fluent Bit → Loki)
 
-Open Grafana → **Explore → Loki** and try (labels: `namespace_name`, `app`, `pod_name`, `container_name`):
+Open Grafana → **Explore → Loki** and try (labels: `app`, `tier`, `job`, `service_name`, `app_kubernetes_io_*`; the namespace and pod name are fields inside the JSON log line):
 
 ```logql
-{namespace_name="dev", app="backend"}                                  # all backend logs
-{namespace_name="dev", app="backend"} | json | status >= 500           # only server errors
-{namespace_name="dev", app="backend"} | json | path=~"/api/items.*" | duration_ms > 100   # slow item calls
-{namespace_name="dev", app="backend"} |= "redis"                       # free-text filter
-sum by (status) (count_over_time({namespace_name="dev", app="backend"} | json [1m]))   # logs → metric
+{app="backend"}                                  # all backend logs
+{app="backend"} | json | status >= 500           # only server errors
+{app="backend"} | json | path=~"/api/items.*" | duration_ms > 100   # slow item calls
+{app="backend"} |= "redis"                       # free-text filter
+sum by (status) (count_over_time({app="backend"} | json [1m]))   # logs → metric
 ```
 
 Labels are low-cardinality by design (Loki indexes labels, not lines); fields like `status`/`path` are parsed at query time from the JSON log line.
@@ -542,3 +542,46 @@ Two Ingress objects are used because annotations are per-Ingress. Try it: `for i
 7. Load-test-driven tuning of HPA targets and rate limits instead of reasoned guesses.
 
 ---
+
+---
+
+## Deployment evidence (screenshots)
+
+Every screenshot below was taken from this repo running on a local kind cluster.
+
+### Task 1: Docker / Compose
+| | |
+|---|---|
+| App running through Compose | ![compose app](docs/compose-app.png) |
+| Containers and health | ![compose ps](docs/compose-ps.png) |
+
+### Task 2: Kubernetes (`dev` namespace)
+| | |
+|---|---|
+| All resources in `dev` | ![kubectl get all](docs/kubectl-get-all-dev.png) |
+| App via NodePort 30080 | ![nodeport](docs/k8s-app-nodeport.png) |
+
+### Task 3: Ingress
+| | |
+|---|---|
+| App at `http://node-react.local` | ![app via ingress](docs/app-node-react-local.png) |
+| Ingress objects | ![ingress](docs/ingress.png) |
+
+### Task 4: CI/CD (GitHub Actions)
+Test and image build/push both pass on `master`. Deploy runs only when a self-hosted runner is configured.
+
+![github actions run](docs/github-actions-run.png)
+
+### Task 5: Platform services
+| | |
+|---|---|
+| Redis, OpenSearch, BullMQ worker | ![platform services](docs/task5-platform-services.png) |
+| NetworkPolicy isolation | ![network isolation](docs/task5-network-isolation.png) |
+
+### Task 6: Observability and scaling
+| | |
+|---|---|
+| Grafana backend dashboard | ![grafana](docs/grafana-backend-overview.png) |
+| HPA scaling under load | ![hpa](docs/hpa-scaling.png) |
+| Ingress rate limiting (100 requests: 68 x 200, 32 x 429) | ![rate limit](docs/rate-limit.png) |
+| Centralised logs in Loki (`{app="backend"}`) | ![loki](docs/loki-query.png) |
