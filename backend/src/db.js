@@ -57,3 +57,9 @@ export async function pingWrite() {
 export async function pingRead() {
   await readPool.query("SELECT 1");
 }
+
+// An idle pooled connection that the server drops (e.g. Postgres restarts)
+// emits "error". Without a listener Node treats it as uncaught and the process
+// dies. Log it; the pool discards the bad client and reconnects on next query.
+writePool.on("error", (err) => console.error("write pool error:", err.message));
+readPool.on("error", (err) => console.error("read pool error:", err.message));
