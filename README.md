@@ -7,13 +7,14 @@ read/write DB) and observability with autoscaling and rate limiting.
 
 Everything runs **locally** (Docker + kind/minikube). Nothing here needs a cloud account.
 
-> **Verification status — read this first.** Every file was written to be run, and
-> I statically validated what could be validated offline (YAML lint, Compose
-> parse, shell syntax, backend unit tests, frontend build). The environment this
-> repo was authored in had **no Docker daemon and no Kubernetes cluster**, so the
-> end-to-end runs and the screenshots in [`docs/`](docs/README.md) still need to be
-> produced on a machine with Docker + kind. [`docs/README.md`](docs/README.md) lists
-> the exact commands to capture each piece of evidence.
+> **Verification status.** Everything in this repository was run end to end on a local
+> kind cluster (Docker, Kubernetes 1.31, ingress-nginx), and the proof is in
+> [`docs/`](docs/README.md): Compose, the `dev` namespace, the Ingress at
+> `http://node-react.local`, platform services with network isolation,
+> Prometheus/Grafana/Loki, HPA scaling under load, rate limiting (429s), and a green
+> GitHub Actions pipeline that tests, builds, pushes to GHCR and deploys to the cluster
+> through a self-hosted runner. The `preprod` and `release` environments are defined in
+> the workflow and documented, but were not exercised in this run.
 
 ## Contents
 
@@ -380,12 +381,12 @@ Stages: install deps (backend, frontend) → build/validate and **test** (4 back
 | Secret | Where | Used for |
 |---|---|---|
 | `GITHUB_TOKEN` | automatic, per-run, short-lived | login to GHCR (`packages: write` only on the build job). **No long-lived registry password exists** |
-| `KUBECONFIG_B64` | GitHub **Environment** secret (`dev`, `preprod`, `release`), each with credentials for that environment only | decoded at deploy time into `~/.kube/config` (mode 0600), deleted in an `always()` step, never echoed |
+| `KUBECONFIG_B64` | GitHub **Environment** secret (`dev`, `preprod`, `release`), each with credentials for that environment only | decoded at deploy time into a temp file (`$RUNNER_TEMP/kubeconfig`, mode 0600) and exposed through `KUBECONFIG`, so a self-hosted runner's own `~/.kube/config` is never touched, deleted in an `always()` step, never echoed |
 | `DB_USER`, `DB_PASSWORD` | GitHub Environment secrets (required for preprod/release) | `deploy.sh` runs `kubectl create secret … --dry-run | apply`, so credentials never touch git or an image |
 
 Practices: secrets are scoped per **Environment** (a `master` build can never read release credentials); the `release` Environment should have **required reviewers** (manual approval gate); deploy jobs use `concurrency` so two deploys to one namespace never interleave; workflow `permissions` default to read-only; secrets are passed through `env:` and never interpolated into shell text where avoidable; third-party actions are limited to official `actions/*` and `docker/*`. In production I would replace the long-lived kubeconfig with OIDC federation to the cluster, or switch to GitOps (Argo CD pulls from git, so CI needs no cluster credentials at all).
 
-> **Local cluster caveat.** GitHub-hosted runners cannot reach a kind cluster on your laptop. Install a **self-hosted runner** on the machine running kind and set the repository variable `DEPLOY_RUNNER` to its label (the deploy/rollback jobs use `runs-on: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}`). The `test` and `build-and-push` jobs work on hosted runners unchanged. For a throw-away demo, `kind-up.sh` + `scripts/deploy.sh` run the exact same deploy path by hand.
+> **Local cluster note.** GitHub-hosted runners cannot reach a kind cluster on a laptop, so the deploy and rollback jobs run on a **self-hosted runner** installed on the machine hosting kind. The repository variable `DEPLOY_RUNNER` selects it (`runs-on: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}`; here it is `self-hosted`). The `test` and `build-and-push` jobs run on hosted runners unchanged. For a throw-away demo, `kind-up.sh` + `scripts/deploy.sh` run the same deploy path by hand.
 
 ### Rollback strategy
 

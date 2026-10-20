@@ -1,18 +1,30 @@
 # Evidence
 
-Screenshots and diagrams are **not yet captured**: the environment this repository was authored
-in had no Docker daemon / Kubernetes cluster, so nothing here has been run end to end. On a machine
-with Docker + kind, produce each item below and save it in this folder with the suggested name.
+Every screenshot here was taken from this repository running on a local kind cluster.
+The top-level [README](../README.md) embeds the key ones next to the task they prove.
 
-| Evidence | How | File |
+| Task | Evidence | File |
 |---|---|---|
-| `kubectl get all -n dev` | `./scripts/kind-up.sh && kubectl get all -n dev` | `kubectl-get-all-dev.png` |
-| App at http://node-react.local | add hosts entry, open in browser, add an item | `app-node-react-local.png` |
-| Ingress | `kubectl -n dev get ingress` | `ingress.png` |
-| Grafana dashboard | `./scripts/observability-up.sh`, then `./scripts/load-test.sh 180 20`, open http://localhost:30300 → Backend overview | `grafana-backend-overview.png` |
-| HPA scaling | `kubectl -n dev get hpa backend-hpa -w` during the load test | `hpa-scaling.png` |
-| Loki log query | Grafana → Explore → `{namespace_name="dev", app="backend"} \| json \| status >= 500` | `loki-query.png` |
-| Rate limiting | the `curl … \| sort \| uniq -c` loop in the README showing 200s and 429s | `rate-limit.png` |
-| Passing GitHub Actions run | push to `master` on your fork; screenshot the green run | `github-actions-run.png` |
+| 1. Compose | App running through Docker Compose | [compose-app.png](compose-app.png) |
+| 1. Compose | Containers and health (`docker compose ps`) | [compose-ps.png](compose-ps.png) |
+| 2. Kubernetes | `kubectl get all -n dev` | [kubectl-get-all-dev.png](kubectl-get-all-dev.png) |
+| 2. Kubernetes | Frontend via NodePort 30080 | [k8s-app-nodeport.png](k8s-app-nodeport.png) |
+| 3. Ingress | App at http://node-react.local | [app-node-react-local.png](app-node-react-local.png) |
+| 3. Ingress | `kubectl -n dev get ingress` | [ingress.png](ingress.png) |
+| 4. CI/CD | First run: tests and image build | [github-actions-run.png](github-actions-run.png) |
+| 4. CI/CD | Full run including deploy | [github-actions-deploy.png](github-actions-deploy.png) |
+| 4. CI/CD | Deploy and smoke-test log | [github-actions-deploy-log.png](github-actions-deploy-log.png) |
+| 4. CI/CD | Images in GHCR | [ghcr-packages.png](ghcr-packages.png) |
+| 4. CI/CD | Environment secrets (values hidden) | [github-environment.png](github-environment.png) |
+| 4. CI/CD | Self-hosted runner online | [github-runner.png](github-runner.png) |
+| 4. CI/CD | Runner finishing deploy jobs | [github-runner-terminal.png](github-runner-terminal.png) |
+| 4. CI/CD | Pods running the GHCR images | [deployed-ghcr-images.png](deployed-ghcr-images.png) |
+| 4. CI/CD | App served by the deployed images | [deployed-app.png](deployed-app.png) |
+| 5. Platform services | Redis, worker and search running | [task5-platform-services.png](task5-platform-services.png) |
+| 5. Platform services | NetworkPolicy isolation test | [task5-network-isolation.png](task5-network-isolation.png) |
+| 6. Observability | Grafana backend dashboard | [grafana-backend-overview.png](grafana-backend-overview.png) |
+| 6. Scaling | HPA scaling under load | [hpa-scaling.png](hpa-scaling.png) |
+| 6. Rate limiting | 100 requests: 68 x 200, 32 x 429 | [rate-limit.png](rate-limit.png) |
+| 6. Logging | Loki query `{app="backend"}` | [loki-query.png](loki-query.png) |
 
 Architecture and sequence diagrams are embedded in the top-level README as Mermaid (rendered by GitHub).
