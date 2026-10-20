@@ -153,8 +153,8 @@ jobs:
         env:
           KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
         run: |
-          install -d -m 700 "$HOME/.kube"
-          (umask 077; printf '%s' "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config")
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+          (umask 077; printf '%s' "$KUBECONFIG_B64" | base64 -d > "$RUNNER_TEMP/kubeconfig")
 
       - name: Deploy
         env:
@@ -181,7 +181,7 @@ jobs:
 
       - name: Remove kubeconfig
         if: always()
-        run: rm -f "$HOME/.kube/config"
+        run: rm -f "$RUNNER_TEMP/kubeconfig"
 
   rollback:
     name: Manual rollback
@@ -193,8 +193,8 @@ jobs:
         env:
           KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
         run: |
-          install -d -m 700 "$HOME/.kube"
-          (umask 077; printf '%s' "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config")
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+          (umask 077; printf '%s' "$KUBECONFIG_B64" | base64 -d > "$RUNNER_TEMP/kubeconfig")
 
       - name: Roll back
         env:
@@ -216,4 +216,4 @@ jobs:
 
       - name: Remove kubeconfig
         if: always()
-        run: rm -f "$HOME/.kube/config"
+        run: rm -f "$RUNNER_TEMP/kubeconfig"
