@@ -568,9 +568,19 @@ Every screenshot below was taken from this repo running on a local kind cluster.
 | Ingress objects | ![ingress](docs/ingress.png) |
 
 ### Task 4: CI/CD (GitHub Actions)
-Test and image build/push both pass on `master`. Deploy runs only when a self-hosted runner is configured.
+`test` -> `build-and-push` (GHCR) -> `deploy` (self-hosted runner -> kind cluster). Deploy uses the `dev` GitHub Environment secrets (`KUBECONFIG_B64`, `DB_USER`, `DB_PASSWORD`) and the repository variable `DEPLOY_RUNNER=self-hosted`. The kubeconfig is written to a temp file and deleted at the end of the job. After rollout, a smoke test calls `/api/health/ready` inside the backend pod.
 
-![github actions run](docs/github-actions-run.png)
+| | |
+|---|---|
+| First run: tests + image build | ![ci run](docs/github-actions-run.png) |
+| Full pipeline run including deploy | ![deploy run](docs/github-actions-deploy.png) |
+| Deploy + smoke test log | ![deploy log](docs/github-actions-deploy-log.png) |
+| Images published to GHCR | ![ghcr](docs/ghcr-packages.png) |
+| Environment secrets (values hidden) | ![environment](docs/github-environment.png) |
+| Self-hosted runner online | ![runner](docs/github-runner.png) |
+| Runner picking up and finishing deploy jobs | ![runner terminal](docs/github-runner-terminal.png) |
+| Pods running the GHCR images | ![deployed images](docs/deployed-ghcr-images.png) |
+| App served by the deployed images | ![deployed app](docs/deployed-app.png) |
 
 ### Task 5: Platform services
 | | |
